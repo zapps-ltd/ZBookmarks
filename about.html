@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About ZBookmarks</title>
+<style>
+:root { color-scheme: light dark; --bg: #f4f6fb; --card: #ffffff;
+  --text: #1a1e29; --muted: #4b5366; --accent: #1d5bbf; --on-accent: #ffffff;
+  --border: #d8dce6; --focus: #ffb000; }
+@media (prefers-color-scheme: dark) { :root { --bg: #11141b; --card: #1a1f2c;
+  --text: #eef1f7; --muted: #bcc3d2; --accent: #8ab4ff; --on-accent: #0b1220;
+  --border: #2c3346; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 17px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+main { max-width: 46rem; margin: 0 auto; padding: 1.5rem 1.1rem 2.5rem; }
+.hero { background: linear-gradient(135deg, #1d5bbf, #6a3fc2); color: #ffffff;
+  border-radius: 18px; padding: 1.6rem 1.5rem; margin-bottom: 1.25rem; }
+.hero h1 { margin: 0 0 .35rem; font-size: 1.9rem; line-height: 1.25; }
+.hero p { margin: .15rem 0; }
+.hero .by { font-size: 1.15rem; font-weight: 600; }
+section { background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 1.1rem 1.4rem; margin: 0 0 1rem; }
+h2 { margin: 0 0 .6rem; font-size: 1.3rem; color: var(--accent); }
+ul { margin: .3rem 0; padding-inline-start: 1.3rem; }
+li { margin-bottom: .4rem; }
+a { color: var(--accent); }
+.buttons { display: flex; flex-wrap: wrap; gap: .6rem; margin: .4rem 0 0; }
+a.button { display: inline-block; background: var(--accent); color: var(--on-accent);
+  padding: .65rem 1.15rem; border-radius: 10px; text-decoration: none; font-weight: 600; }
+a.button.secondary { background: transparent; color: var(--accent);
+  border: 2px solid var(--accent); }
+a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+footer { color: var(--muted); text-align: center; font-size: .95rem; margin-top: 1.4rem; }
+@media (forced-colors: active) { .hero { background: Canvas; color: CanvasText;
+  border: 1px solid CanvasText; } a.button { border: 2px solid LinkText; } }
+</style>
+</head>
+<body>
+<main>
+<header class="hero">
+<h1>About ZBookmarks</h1>
+<p class="by">By zapps-ltd</p>
+<p>Version 1.0.1</p>
+</header>
+<section>
+<h2>What it does</h2>
+<p>A Windows 10 and 11 shortcut maker: a time and effort saving little tool.</p>
+<ul><li>100 percent accessible with all screen readers.</li><li>Small size, portable by design.</li></ul>
+</section>
+<section>
+<h2>Developers team</h2>
+<p>zapps.ltd developers: <span id="team-first">Harith</span> and <span id="team-second">Mesar</span></p>
+</section>
+<section>
+<h2>Contact</h2>
+<p class="buttons"><a class="button" href="mailto:support@zapps.ltd">Email support@zapps.ltd</a> <a class="button secondary" href="https://zapps.ltd">Visit zapps.ltd</a></p>
+</section>
+<section>
+<h2>Credits and licenses</h2>
+<ul><li>wxPython and wxWidgets - wxWindows Library Licence, version 3.1</li><li>Python - Python Software Foundation License</li><li>PyInstaller (bootloader, in the built program) - GNU General Public License version 2 or later with the bootloader exception</li></ul>
+<p>ZBookmarks is free software under the GNU Affero General Public License, version 3 or later. This applies to the code of ZBookmarks only: every component listed above keeps its own license, and the full list is in THIRD_PARTY_NOTICES.md at github.com/zapps-ltd/ZBookmarks.</p>
+</section>
+<footer><p>Copyright © 2026 ZAPPS SOFTWARE LTD.</p></footer>
+</main>
+<script>(function () { if (Math.random() < 0.5) { var a = document.getElementById("team-first"), b = document.getElementById("team-second"); if (a && b) { var x = a.textContent; a.textContent = b.textContent; b.textContent = x; } } })();</script>
+</body>
+</html>
