@@ -98,7 +98,7 @@ ZBookmarks is free software, licensed under the GNU Affero General Public Licens
 
 ## Third-party software and credits
 
-ZBookmarks is built on the work of others:
+ZBookmarks is built using:
 
 - wxPython, by Robin Dunn, Scott Talbert and the wxPython contributors, and wxWidgets, by Julian Smart, Robert Roebling, Vadim Zeitlin and the wxWidgets team: wxWindows Library Licence 3.1 (https://wxpython.org, https://www.wxwidgets.org).
 - Python, by the Python Software Foundation: PSF-2.0 (https://www.python.org).
