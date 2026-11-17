@@ -145,23 +145,19 @@ def default_save_dir():
     return d
 
 # ─── Sound ────────────────────────────────────────────────────────────────────
-def play_chime():
+def play_chime(wait=False):
+    """Play the chime inside this program. No helper process: a helper started
+    from the exe loads the exe's bundled DLLs and keeps them locked after the
+    exe exits, so the exe cannot remove its temp folder. wait=True plays the
+    short chime to the end, for when the window closes straight after."""
     wav = _get_resource("01.wav")
     if os.path.exists(wav):
         try:
-            # Play a temporary copy: the player outlives this program, and a player
-            # holding the bundled file would stop the exe removing its temp folder.
-            import tempfile, shutil
-            fd, tmp = tempfile.mkstemp(prefix="zbm_", suffix=".wav")
-            os.close(fd)
-            shutil.copyfile(wav, tmp)
-            q = tmp.replace("'", "''")
-            subprocess.Popen(
-                ["powershell", "-NoProfile", "-WindowStyle", "Hidden",
-                 "-Command", f"$p='{q}'; (New-Object Media.SoundPlayer $p).PlaySync(); "
-                             "Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue"],
-                creationflags=subprocess.CREATE_NO_WINDOW
-            )
+            import winsound
+            flags = winsound.SND_FILENAME | winsound.SND_NODEFAULT
+            if not wait:
+                flags |= winsound.SND_ASYNC
+            winsound.PlaySound(wav, flags)
         except Exception:
             pass
 
@@ -535,8 +531,136 @@ if hasattr(wx, "Accessible"):
             if childId == 0 and self.desc:
                 return (wx.ACC_OK, self.desc)
             return (wx.ACC_NOT_IMPLEMENTED, "")
+
+        # Dark mode draws check boxes itself, and Windows then reports them as
+        # plain buttons with no state. Report a check box and its state instead.
+        def _check(self, childId):
+            w = self.GetWindow()
+            return w if childId == 0 and isinstance(w, wx.CheckBox) else None
+
+        def GetRole(self, childId):
+            if self._check(childId):
+                return (wx.ACC_OK, wx.ROLE_SYSTEM_CHECKBUTTON)
+            return (wx.ACC_NOT_IMPLEMENTED, 0)
+
+        def GetState(self, childId):
+            w = self._check(childId)
+            if not w:
+                return (wx.ACC_NOT_IMPLEMENTED, 0)
+            st = wx.ACC_STATE_SYSTEM_FOCUSABLE
+            if w.HasFocus():
+                st |= wx.ACC_STATE_SYSTEM_FOCUSED
+            if w.GetValue():
+                st |= wx.ACC_STATE_SYSTEM_CHECKED
+            if not w.IsEnabled():
+                st |= wx.ACC_STATE_SYSTEM_UNAVAILABLE
+            return (wx.ACC_OK, st)
+
+        def GetDefaultAction(self, childId):
+            w = self._check(childId)
+            if not w:
+                return (wx.ACC_NOT_IMPLEMENTED, "")
+            return (wx.ACC_OK, "Uncheck" if w.GetValue() else "Check")
+
+        def DoDefaultAction(self, childId):
+            w = self._check(childId)
+            if not w:
+                return wx.ACC_NOT_IMPLEMENTED
+            w.SetValue(not w.GetValue())
+            evt = wx.CommandEvent(wx.wxEVT_CHECKBOX, w.GetId())
+            evt.SetEventObject(w)
+            evt.SetInt(int(w.GetValue()))
+            w.GetEventHandler().ProcessEvent(evt)
+            return wx.ACC_OK
 else:
     _Acc = None
+
+def _state_changed(win):
+    """Tell screen readers a check box was checked or unchecked."""
+    try:
+        wx.Accessible.NotifyEvent(wx.ACC_EVENT_OBJECT_STATECHANGE, win,
+                                  wx.OBJID_CLIENT, wx.ACC_SELF)
+    except Exception:
+        pass
+
+# ─── Real check box type for dark-mode check boxes ───────────────────────────
+# In dark mode wx draws check boxes itself, so Windows marks them as self-drawn
+# buttons, and some screen readers (JAWS) then read "button" with no state on
+# focus. Between messages the control is marked as a check box; while it handles
+# a message it is self-drawn again, so wx draws and behaves exactly as before.
+# BM_GETCHECK and BM_GETSTATE answer with the wx value.
+import ctypes.wintypes as _wt
+_u32 = ctypes.WinDLL("user32", use_last_error=True)
+_LRESULT = ctypes.c_ssize_t
+_WNDPROC = ctypes.WINFUNCTYPE(_LRESULT, _wt.HWND, _wt.UINT, _wt.WPARAM, _wt.LPARAM)
+_u32.GetWindowLongW.argtypes = [_wt.HWND, ctypes.c_int]
+_u32.GetWindowLongW.restype = ctypes.c_long
+_u32.SetWindowLongW.argtypes = [_wt.HWND, ctypes.c_int, ctypes.c_long]
+_u32.SetWindowLongW.restype = ctypes.c_long
+_GetWndPtr = getattr(_u32, "GetWindowLongPtrW", _u32.GetWindowLongW)
+_SetWndPtr = getattr(_u32, "SetWindowLongPtrW", _u32.SetWindowLongW)
+_GetWndPtr.argtypes = [_wt.HWND, ctypes.c_int]
+_GetWndPtr.restype = ctypes.c_void_p
+_SetWndPtr.argtypes = [_wt.HWND, ctypes.c_int, ctypes.c_void_p]
+_SetWndPtr.restype = ctypes.c_void_p
+_u32.CallWindowProcW.argtypes = [ctypes.c_void_p, _wt.HWND, _wt.UINT, _wt.WPARAM, _wt.LPARAM]
+_u32.CallWindowProcW.restype = _LRESULT
+_u32.InvalidateRect.argtypes = [_wt.HWND, ctypes.c_void_p, _wt.BOOL]
+
+_GWL_STYLE, _GWLP_WNDPROC = -16, -4
+_BS_TYPEMASK, _BS_AUTOCHECKBOX, _BS_OWNERDRAW = 0xF, 0x3, 0xB
+_WM_STYLECHANGING, _WM_STYLECHANGED, _WM_NCDESTROY = 0x7C, 0x7D, 0x82
+_BM_GETCHECK, _BM_SETCHECK, _BM_GETSTATE = 0xF0, 0xF1, 0xF2
+
+def _native_check_type(c):
+    """Mark a self-drawn wx.CheckBox as a real check box for Windows.
+    Does nothing when wx draws the control natively."""
+    try:
+        hwnd = c.GetHandle()
+        if (_u32.GetWindowLongW(hwnd, _GWL_STYLE) & _BS_TYPEMASK) != _BS_OWNERDRAW:
+            return
+        st = {"depth": 0, "flipping": False, "gone": False}
+        prev = _GetWndPtr(hwnd, _GWLP_WNDPROC)
+
+        def set_type(t):
+            s = _u32.GetWindowLongW(hwnd, _GWL_STYLE)
+            if (s & _BS_TYPEMASK) != t:
+                st["flipping"] = True
+                try:
+                    _u32.SetWindowLongW(hwnd, _GWL_STYLE, (s & ~_BS_TYPEMASK) | t)
+                finally:
+                    st["flipping"] = False
+
+        def proc(h, msg, wp, lp):
+            if st["flipping"] and msg in (_WM_STYLECHANGING, _WM_STYLECHANGED):
+                return 0
+            st["depth"] += 1
+            if st["depth"] == 1:
+                set_type(_BS_OWNERDRAW)
+            try:
+                if msg == _BM_GETCHECK:
+                    return 1 if c.GetValue() else 0
+                r = _u32.CallWindowProcW(prev, h, msg, wp, lp)
+                if msg == _BM_GETSTATE:
+                    r = (r & ~3) | (1 if c.GetValue() else 0)
+                elif msg == _BM_SETCHECK:
+                    _u32.InvalidateRect(h, None, True)
+                elif msg == _WM_NCDESTROY:
+                    st["gone"] = True
+                    if _GetWndPtr(h, _GWLP_WNDPROC) == ctypes.cast(cb, ctypes.c_void_p).value:
+                        _SetWndPtr(h, _GWLP_WNDPROC, prev)
+                return r
+            finally:
+                st["depth"] -= 1
+                if st["depth"] == 0 and not st["gone"]:
+                    set_type(_BS_AUTOCHECKBOX)
+
+        cb = _WNDPROC(proc)
+        c._zb_native_check = cb      # keeps the callback alive with the control
+        _SetWndPtr(hwnd, _GWLP_WNDPROC, ctypes.cast(cb, ctypes.c_void_p))
+        set_type(_BS_AUTOCHECKBOX)
+    except Exception as e:
+        _log(f"check box type: {e!r}")
 
 def _acc(win, name="", desc=""):
     """Give a control a screen reader name and/or description."""
@@ -591,8 +715,12 @@ def checkbox(parent, text, checked, name="", desc=""):
     c = wx.CheckBox(parent, label=text)
     c.SetFont(_font(10))
     c.SetValue(bool(checked))
-    if (name and name != text) or desc:
-        _acc(c, name if name != text else "", desc)
+    _acc(c, name if name != text else "", desc)
+    _native_check_type(c)
+    def _changed(evt):
+        _state_changed(c)
+        evt.Skip()
+    c.Bind(wx.EVT_CHECKBOX, _changed)
     return c
 
 def sep(parent):
@@ -779,7 +907,7 @@ class SettingsDialog(wx.Dialog):
         self.cb_desktop = checkbox(hk_box, "Create a ZBookmarks shortcut on the Desktop",
                                    has_desktop or self.settings.get("desktop_shortcut", False))
         self.cb_desktop.Bind(wx.EVT_CHECKBOX,
-                             lambda evt: self._on_desktop_toggled(evt.IsChecked()))
+                             lambda evt: (self._on_desktop_toggled(evt.IsChecked()), evt.Skip()))
         hv.Add(self.cb_desktop, 0, wx.ALL, 6)
 
         hk_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -976,7 +1104,7 @@ class FirstRunDialog(wx.Dialog):
         pv = wx.BoxSizer(wx.VERTICAL)
         self.cb_desktop = checkbox(panel, "Create a shortcut to ZBookmarks on the Desktop", True)
         self.cb_desktop.Bind(wx.EVT_CHECKBOX,
-                             lambda evt: self._on_desktop_toggled(evt.IsChecked()))
+                             lambda evt: (self._on_desktop_toggled(evt.IsChecked()), evt.Skip()))
         pv.Add(self.cb_desktop, 0, wx.BOTTOM, 8)
 
         self.cb_grab = checkbox(panel, "Grab the URL or folder path from the active window when opened",
@@ -1319,7 +1447,7 @@ class MainWindow(wx.Frame):
             # Persistent feedback — the status line tells the user the full path
             self._status(f"Shortcut created: {filepath}", C_OK)
             if self.settings["play_sound"]:
-                play_chime()
+                play_chime(wait=self.settings.get("close_on_success", False))
             if self.settings.get("close_on_success", False):
                 self.Close()
         else:

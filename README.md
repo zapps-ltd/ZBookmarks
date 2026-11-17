@@ -79,7 +79,7 @@ pip install wxPython
 python zbookmarks.py
 ```
 
-To make a single-file executable, install PyInstaller (`pip install pyinstaller`) and build `zbookmarks.py` as a windowed one-file app. Add `01.wav`, `about.html`, `tips.html` and `privacy.html` as data files in the program's root folder, and `icon.ico` as the icon if you want one. See the PyInstaller documentation for the exact options.
+To make a portable program folder, install PyInstaller (`pip install pyinstaller`) and build `zbookmarks.py` as a windowed one-folder app. Add `01.wav`, `about.html`, `tips.html` and `privacy.html` as data files in the program's root folder, and `icon.ico` as the icon if you want one. See the PyInstaller documentation for the exact options.
 
 ## Interface languages
 
